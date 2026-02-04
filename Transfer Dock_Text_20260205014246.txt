@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAKOS - Эволюция кликера</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #0a0a0b;
+            color: #ffffff;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .main-gradient {
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+        }
+
+        .click-button {
+            transition: transform 0.1s ease;
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.3);
+        }
+
+        .click-button:active {
+            transform: scale(0.92);
+        }
+
+        /* Анимация всплывающих цифр */
+        .floating-point {
+            position: absolute;
+            pointer-events: none;
+            font-weight: 900;
+            color: #60a5fa;
+            animation: floatUp 0.8s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-120px); }
+        }
+
+        /* Кастомный скроллбар для магазина */
+        .shop-container::-webkit-scrollbar {
+            width: 4px;
+        }
+        .shop-container::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="main-gradient min-h-screen flex flex-col items-center">
+
+    <!-- Верхняя панель (Статистика) -->
+    <div class="w-full max-w-lg p-6 flex flex-col items-center mt-8">
+        <h1 class="text-4xl font-black italic text-blue-500 tracking-tighter mb-2">HAKOS</h1>
+        <div class="bg-slate-900/80 border border-slate-800 rounded-3xl px-8 py-4 backdrop-blur-xl shadow-2xl flex flex-col items-center min-w-[280px]">
+            <span id="score" class="text-5xl font-black tabular-nums">0</span>
+            <span class="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Очков собрано</span>
+        </div>
+        
+        <div id="income-rate" class="mt-4 text-blue-400 font-bold flex items-center gap-2">
+            <i data-lucide="zap" class="w-4 h-4 fill-blue-400"></i>
+            Авто-доход: 0/сек
+        </div>
+    </div>
+
+    <!-- Основная область клика -->
+    <div class="flex-1 flex items-center justify-center w-full relative" id="click-zone">
+        <button id="clicker" class="click-button relative w-64 h-64 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 border-8 border-white/10 flex items-center justify-center group">
+            <div class="absolute inset-0 bg-blue-400 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
+            <i data-lucide="mouse-pointer-2" class="w-20 h-20 text-white drop-shadow-lg"></i>
+        </button>
+    </div>
+
+    <!-- Магазин (Нижняя панель) -->
+    <div class="w-full max-w-md bg-slate-900/90 border-t border-slate-800 rounded-t-[40px] p-8 pb-10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+                <i data-lucide="shopping-cart" class="text-blue-500"></i> Магазин
+            </h2>
+            <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Инфляция: x1.7</span>
+        </div>
+
+        <div class="shop-container">
+            <!-- Предмет: Завод -->
+            <div onclick="buyUpgrade()" id="upgrade-card" class="group bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-blue-500/50 p-4 rounded-2xl flex items-center gap-4 cursor-pointer transition-all active:scale-95">
+                <div class="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
+                    <i data-lucide="factory" class="text-blue-400 w-8 h-8"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="font-bold text-lg text-slate-100">Завод HAKOS</div>
+                    <div class="text-xs text-slate-400">+2 очка в секунду</div>
+                </div>
+                <div class="text-right">
+                    <div id="upgrade-price" class="text-green-400 font-black text-lg">50</div>
+                    <div id="upgrade-level" class="text-[10px] text-slate-500 font-bold uppercase">Ур. 0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация иконок Lucide
+        lucide.createIcons();
+
+        // Основное состояние (State)
+        let stats = {
+            score: 0,
+            autoIncome: 0,
+            upgrades: {
+                factory: {
+                    level: 0,
+                    basePrice: 50,
+                    incomePerLevel: 2,
+                    inflation: 1.7
+                }
+            }
+        };
+
+        // Элементы DOM
+        const scoreDisplay = document.getElementById('score');
+        const incomeDisplay = document.getElementById('income-rate');
+        const clickerBtn = document.getElementById('clicker');
+        const clickZone = document.getElementById('click-zone');
+        const factoryPriceDisplay = document.getElementById('upgrade-price');
+        const factoryLevelDisplay = document.getElementById('upgrade-level');
+
+        // Обновление интерфейса
+        function updateUI() {
+            scoreDisplay.innerText = Math.floor(stats.score).toLocaleString();
+            incomeDisplay.innerHTML = `<i data-lucide="zap" class="w-4 h-4 fill-blue-400"></i> Авто-доход: ${stats.autoIncome}/сек`;
+            
+            // Расчет цены с инфляцией
+            const nextPrice = Math.floor(stats.upgrades.factory.basePrice * Math.pow(stats.upgrades.factory.inflation, stats.upgrades.factory.level));
+            factoryPriceDisplay.innerText = nextPrice.toLocaleString();
+            factoryLevelDisplay.innerText = `Ур. ${stats.upgrades.factory.level}`;
+            
+            // Визуальная проверка: хватает ли денег
+            const card = document.getElementById('upgrade-card');
+            if (stats.score < nextPrice) {
+                factoryPriceDisplay.classList.replace('text-green-400', 'text-red-500');
+                card.style.opacity = '0.6';
+            } else {
+                factoryPriceDisplay.classList.replace('text-red-500', 'text-green-400');
+                card.style.opacity = '1';
+            }
+            lucide.createIcons();
+        }
+
+        // Логика клика
+        clickerBtn.addEventListener('click', (e) => {
+            stats.score += 1;
+            spawnParticle(e.clientX, e.clientY);
+            updateUI();
+        });
+
+        // Создание вылетающей цифры
+        function spawnParticle(x, y) {
+            const p = document.createElement('div');
+            p.className = 'floating-point';
+            p.innerText = '+1';
+            p.style.left = `${x - 10}px`;
+            p.style.top = `${y - 20}px`;
+            document.body.appendChild(p);
+            
+            // Удаляем элемент после завершения анимации
+            setTimeout(() => p.remove(), 800);
+        }
+
+        // Покупка улучшения
+        function buyUpgrade() {
+            const upgrade = stats.upgrades.factory;
+            const currentPrice = Math.floor(upgrade.basePrice * Math.pow(upgrade.inflation, upgrade.level));
+
+            if (stats.score >= currentPrice) {
+                stats.score -= currentPrice;
+                upgrade.level += 1;
+                stats.autoIncome = upgrade.level * upgrade.incomePerLevel;
+                updateUI();
+            }
+        }
+
+        // Игровой цикл (обработка дохода раз в секунду)
+        setInterval(() => {
+            if (stats.autoIncome > 0) {
+                stats.score += stats.autoIncome;
+                updateUI();
+            }
+        }, 1000);
+
+        // Первый запуск
+        updateUI();
+
+    </script>
+</body>
+</html>
